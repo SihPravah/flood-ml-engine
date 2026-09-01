@@ -25,11 +25,29 @@ class XGBoostRiskPrediction:
 
 
 class XGBoostRiskModel:
+    """
+    XGBoost flash-flood risk classifier.
+
+    scale_pos_weight controls the relative importance of
+    positive flood samples.
+
+    A value greater than 1 increases the cost of missing
+    positive-class examples during training.
+    """
+
     def __init__(
         self,
         model_version: str = "xgboost-v1",
         random_state: int = 42,
+        scale_pos_weight: float = 1.0,
     ) -> None:
+        if scale_pos_weight <= 0.0:
+            raise ValueError(
+                "scale_pos_weight must be greater than 0."
+            )
+
+        self.scale_pos_weight = scale_pos_weight
+
         self.model = XGBClassifier(
             n_estimators=150,
             max_depth=4,
@@ -40,9 +58,12 @@ class XGBoostRiskModel:
             eval_metric="logloss",
             random_state=random_state,
             n_jobs=1,
+            scale_pos_weight=scale_pos_weight,
         )
 
         self.model_version = model_version
+        self.random_state = random_state
+
         self._is_fitted = False
 
     @property

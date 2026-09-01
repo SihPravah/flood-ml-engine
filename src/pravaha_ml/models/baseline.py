@@ -46,11 +46,8 @@ def hydrology_features_to_vector(
     features: HydrologyFeatures,
 ) -> np.ndarray:
     """
-    Convert HydrologyFeatures into the stable numeric feature order
-    used by PRAVAHA's ML models.
-
-    The exact ordering defined in FEATURE_NAMES must remain stable
-    between training and inference.
+    Convert HydrologyFeatures into PRAVAHA's stable
+    numeric model feature order.
     """
 
     values = asdict(features)
@@ -66,32 +63,34 @@ def hydrology_features_to_vector(
 
 class BaselineRiskModel:
     """
-    Logistic Regression baseline model for PRAVAHA.
+    Logistic Regression baseline for PRAVAHA.
 
-    The model uses a StandardScaler before Logistic Regression
-    because hydrology features operate on very different numerical
-    scales.
+    StandardScaler is included inside the pipeline because
+    hydrological variables have very different numeric scales.
 
-    For example:
+    class_weight can optionally be used for cost-sensitive
+    learning.
 
-        soil_saturation       -> approximately 0 to 1
-        slope_fraction        -> approximately 0 to 0.5
-        curve numbers         -> approximately 40 to 100
-        rainfall              -> tens/hundreds of millimetres
-        flow_length_m         -> hundreds/thousands of metres
+    Examples:
 
-    Scaling improves numerical stability and prevents large-valued
-    features from dominating simply because of their units.
+        class_weight=None
+            standard Logistic Regression
 
-    This model establishes the baseline training/inference interface.
-    It is not PRAVAHA's final production model.
+        class_weight="balanced"
+            automatically increases the relative importance
+            of the minority class
+
+    The positive class represents a flash-flood event.
     """
 
     def __init__(
         self,
         model_version: str = "logreg-v1",
         random_state: int = 42,
+        class_weight: str | dict | None = None,
     ) -> None:
+        self.class_weight = class_weight
+
         self.model = Pipeline(
             steps=[
                 (
@@ -103,6 +102,7 @@ class BaselineRiskModel:
                     LogisticRegression(
                         max_iter=2000,
                         random_state=random_state,
+                        class_weight=class_weight,
                     ),
                 ),
             ]
@@ -115,10 +115,6 @@ class BaselineRiskModel:
 
     @property
     def is_fitted(self) -> bool:
-        """
-        Return whether the model has already been trained.
-        """
-
         return self._is_fitted
 
     def fit(
@@ -126,15 +122,6 @@ class BaselineRiskModel:
         feature_rows: Iterable[HydrologyFeatures],
         labels: Iterable[int],
     ) -> None:
-        """
-        Train the Logistic Regression baseline.
-
-        Labels:
-
-            0 = no flash-flood event
-            1 = flash-flood event
-        """
-
         feature_rows = list(feature_rows)
         labels = list(labels)
 
@@ -181,10 +168,6 @@ class BaselineRiskModel:
         self,
         features: HydrologyFeatures,
     ) -> RiskPrediction:
-        """
-        Predict the flash-flood risk for one hydrology feature row.
-        """
-
         if not self._is_fitted:
             raise RuntimeError(
                 "BaselineRiskModel must be fitted before prediction."
