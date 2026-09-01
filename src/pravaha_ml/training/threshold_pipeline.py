@@ -1,0 +1,278 @@
+from dataclasses import dataclass
+
+import numpy as np
+from sklearn.model_selection import (
+    train_test_split,
+)
+
+from pravaha_ml.models.baseline import (
+    BaselineRiskModel,
+    hydrology_features_to_vector,
+)
+from pravaha_ml.models.xgboost_model import (
+    XGBoostRiskModel,
+)
+from pravaha_ml.training.synthetic import (
+    TrainingSample,
+)
+from pravaha_ml.training.thresholds import (
+    ThresholdMetrics,
+    ThresholdOptimizationResult,
+    evaluate_threshold,
+    optimize_threshold_for_recall,
+)
+
+
+@dataclass(frozen=True)
+class ThresholdModelResult:
+    model_name: str
+    default_threshold_metrics: ThresholdMetrics
+    optimized_threshold: ThresholdOptimizationResult
+
+
+@dataclass(frozen=True)
+class ThresholdPipelineResult:
+    logistic_regression: ThresholdModelResult
+    xgboost: ThresholdModelResult
+
+    train_size: int
+    validation_size: int
+
+    minimum_recall: float
+
+
+def _get_probabilities(
+    model,
+    samples: list[TrainingSample],
+) -> np.ndarray:
+    x = np.vstack(
+        [
+            hydrology_features_to_vector(
+                sample.features
+            )
+            for sample in samples
+        ]
+    )
+
+    return np.asarray(
+        model.model.predict_proba(
+            x
+        )[:, 1],
+        dtype=float,
+    )
+
+
+def _evaluate_model_thresholds(
+    model,
+    model_name: str,
+    validation_samples: list[
+        TrainingSample
+    ],
+    minimum_recall: float,
+) -> ThresholdModelResult:
+    y_true = np.asarray(
+        [
+            sample.label
+            for sample
+            in validation_samples
+        ],
+        dtype=int,
+    )
+
+    probabilities = (
+        _get_probabilities(
+            model=model,
+            samples=validation_samples,
+        )
+    )
+
+    default_metrics = (
+        evaluate_threshold(
+            y_true=y_true,
+            y_score=probabilities,
+            threshold=0.50,
+        )
+    )
+
+    optimized = (
+        optimize_threshold_for_recall(
+            y_true=y_true,
+            y_score=probabilities,
+            minimum_recall=(
+                minimum_recall
+            ),
+        )
+    )
+
+    return ThresholdModelResult(
+        model_name=model_name,
+        default_threshold_metrics=(
+            default_metrics
+        ),
+        optimized_threshold=optimized,
+    )
+
+
+def run_threshold_pipeline(
+    samples: list[TrainingSample],
+    validation_fraction: float = 0.20,
+    minimum_recall: float = 0.85,
+    random_state: int = 42,
+) -> ThresholdPipelineResult:
+    """
+    Train Logistic Regression and XGBoost on the same
+    development split, then compare the default threshold
+    against a recall-oriented optimized threshold.
+
+    IMPORTANT:
+    This currently tunes the threshold on the validation set.
+
+    For final evaluation with real data, PRAVAHA should use:
+
+        training set
+            -> fit model
+
+        calibration/validation set
+            -> choose threshold
+
+        untouched test set
+            -> report final performance
+
+    This development implementation establishes the interface
+    before real labelled data is integrated.
+    """
+
+    samples = list(
+        samples
+    )
+
+    if len(samples) < 20:
+        raise ValueError(
+            "At least 20 samples are required."
+        )
+
+    if not 0.0 < validation_fraction < 1.0:
+        raise ValueError(
+            "validation_fraction must be between 0 and 1."
+        )
+
+    if not 0.0 <= minimum_recall <= 1.0:
+        raise ValueError(
+            "minimum_recall must be between 0 and 1."
+        )
+
+    labels = np.asarray(
+        [
+            sample.label
+            for sample in samples
+        ],
+        dtype=int,
+    )
+
+    if len(
+        np.unique(labels)
+    ) < 2:
+        raise ValueError(
+            "Samples must contain both classes."
+        )
+
+    indices = np.arange(
+        len(samples)
+    )
+
+    train_indices, validation_indices = (
+        train_test_split(
+            indices,
+            test_size=validation_fraction,
+            random_state=random_state,
+            stratify=labels,
+        )
+    )
+
+    training_samples = [
+        samples[index]
+        for index in train_indices
+    ]
+
+    validation_samples = [
+        samples[index]
+        for index in validation_indices
+    ]
+
+    training_features = [
+        sample.features
+        for sample in training_samples
+    ]
+
+    training_labels = [
+        sample.label
+        for sample in training_samples
+    ]
+
+    logistic_model = (
+        BaselineRiskModel(
+            random_state=random_state,
+        )
+    )
+
+    logistic_model.fit(
+        feature_rows=(
+            training_features
+        ),
+        labels=training_labels,
+    )
+
+    xgboost_model = (
+        XGBoostRiskModel(
+            random_state=random_state,
+        )
+    )
+
+    xgboost_model.fit(
+        feature_rows=(
+            training_features
+        ),
+        labels=training_labels,
+    )
+
+    logistic_result = (
+        _evaluate_model_thresholds(
+            model=logistic_model,
+            model_name=(
+                "logistic_regression"
+            ),
+            validation_samples=(
+                validation_samples
+            ),
+            minimum_recall=(
+                minimum_recall
+            ),
+        )
+    )
+
+    xgboost_result = (
+        _evaluate_model_thresholds(
+            model=xgboost_model,
+            model_name="xgboost",
+            validation_samples=(
+                validation_samples
+            ),
+            minimum_recall=(
+                minimum_recall
+            ),
+        )
+    )
+
+    return ThresholdPipelineResult(
+        logistic_regression=(
+            logistic_result
+        ),
+        xgboost=xgboost_result,
+        train_size=len(
+            train_indices
+        ),
+        validation_size=len(
+            validation_indices
+        ),
+        minimum_recall=minimum_recall,
+    )
