@@ -3,6 +3,8 @@ from typing import Iterable
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from pravaha_ml.features.hydrology_features import (
     HydrologyFeatures,
@@ -45,7 +47,10 @@ def hydrology_features_to_vector(
 ) -> np.ndarray:
     """
     Convert HydrologyFeatures into the stable numeric feature order
-    used by the baseline model.
+    used by PRAVAHA's ML models.
+
+    The exact ordering defined in FEATURE_NAMES must remain stable
+    between training and inference.
     """
 
     values = asdict(features)
@@ -61,27 +66,59 @@ def hydrology_features_to_vector(
 
 class BaselineRiskModel:
     """
-    Logistic-regression baseline for PRAVAHA.
+    Logistic Regression baseline model for PRAVAHA.
 
-    This establishes the training/inference contract.
+    The model uses a StandardScaler before Logistic Regression
+    because hydrology features operate on very different numerical
+    scales.
 
-    It is NOT the final production model.
+    For example:
+
+        soil_saturation       -> approximately 0 to 1
+        slope_fraction        -> approximately 0 to 0.5
+        curve numbers         -> approximately 40 to 100
+        rainfall              -> tens/hundreds of millimetres
+        flow_length_m         -> hundreds/thousands of metres
+
+    Scaling improves numerical stability and prevents large-valued
+    features from dominating simply because of their units.
+
+    This model establishes the baseline training/inference interface.
+    It is not PRAVAHA's final production model.
     """
 
     def __init__(
         self,
         model_version: str = "logreg-v1",
+        random_state: int = 42,
     ) -> None:
-        self.model = LogisticRegression(
-            max_iter=2000,
-            random_state=42,
+        self.model = Pipeline(
+            steps=[
+                (
+                    "scaler",
+                    StandardScaler(),
+                ),
+                (
+                    "classifier",
+                    LogisticRegression(
+                        max_iter=2000,
+                        random_state=random_state,
+                    ),
+                ),
+            ]
         )
 
         self.model_version = model_version
+        self.random_state = random_state
+
         self._is_fitted = False
 
     @property
     def is_fitted(self) -> bool:
+        """
+        Return whether the model has already been trained.
+        """
+
         return self._is_fitted
 
     def fit(
@@ -90,9 +127,10 @@ class BaselineRiskModel:
         labels: Iterable[int],
     ) -> None:
         """
-        Train the baseline model.
+        Train the Logistic Regression baseline.
 
         Labels:
+
             0 = no flash-flood event
             1 = flash-flood event
         """
@@ -132,7 +170,10 @@ class BaselineRiskModel:
             dtype=int,
         )
 
-        self.model.fit(x, y)
+        self.model.fit(
+            x,
+            y,
+        )
 
         self._is_fitted = True
 
@@ -140,6 +181,10 @@ class BaselineRiskModel:
         self,
         features: HydrologyFeatures,
     ) -> RiskPrediction:
+        """
+        Predict the flash-flood risk for one hydrology feature row.
+        """
+
         if not self._is_fitted:
             raise RuntimeError(
                 "BaselineRiskModel must be fitted before prediction."
@@ -150,17 +195,24 @@ class BaselineRiskModel:
         ).reshape(1, -1)
 
         probability = float(
-            self.model.predict_proba(vector)[0, 1]
+            self.model.predict_proba(
+                vector
+            )[0, 1]
         )
 
         probability = max(
             0.0,
-            min(probability, 1.0),
+            min(
+                probability,
+                1.0,
+            ),
         )
 
         return RiskPrediction(
             risk_score=probability,
-            risk_level=classify_risk(probability),
+            risk_level=classify_risk(
+                probability
+            ),
             model_name="logistic_regression",
             model_version=self.model_version,
         )
