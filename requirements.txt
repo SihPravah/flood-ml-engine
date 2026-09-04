@@ -3,4 +3,5 @@ pandas
 pydantic
 scikit-learn
 xgboost
+shapely
 pytest
