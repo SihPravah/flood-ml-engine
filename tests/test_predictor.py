@@ -33,6 +33,14 @@ from pravaha_ml.impact.models import (
 from pravaha_ml.inference.confidence import (
     PredictionDisposition,
 )
+from pravaha_ml.demo.ids import (
+    DEMO_CATCHMENT_ID,
+    DEMO_DRAIN_ID,
+    DEMO_ROAD_BYPASS_ID,
+    DEMO_ROAD_DIRECT_ID,
+    DEMO_SHELTER_ID,
+    DEMO_WARD_ID,
+)
 from pravaha_ml.inference.fused_state_adapter import (
     DataStatus,
     adapt_fused_catchment_state,
@@ -89,7 +97,7 @@ def fused_state(
         }
 
     return {
-        "catchment_id": "UK-CHM-DEHRADUN-01",
+        "catchment_id": DEMO_CATCHMENT_ID,
         "state_time": state_time.isoformat(),
         "rainfall": {
             "intensity": {
@@ -126,7 +134,7 @@ def full_context(
     landslide_prone: bool = True,
 ) -> PredictorContext:
     drain_profile = DrainStaticProfile(
-        drain_id="DRAIN-01",
+        drain_id=DEMO_DRAIN_ID,
         width_m=0.28,
         depth_m=0.25,
         slope_fraction=0.015,
@@ -134,10 +142,10 @@ def full_context(
         blockage_fraction=0.35,
         condition=DrainCondition.DEGRADED,
         capacity_provenance=DrainCapacityProvenance.ESTIMATED,
-        catchment_id="UK-CHM-DEHRADUN-01",
+        catchment_id=DEMO_CATCHMENT_ID,
     )
     drain = DrainageSegment(
-        drain_id="DRAIN-01",
+        drain_id=DEMO_DRAIN_ID,
         geometry=LineString(
             [
                 (78.0300, 30.3200),
@@ -145,36 +153,36 @@ def full_context(
             ]
         ),
         provenance=SpatialDataProvenance.ESTIMATED,
-        catchment_id="UK-CHM-DEHRADUN-01",
+        catchment_id=DEMO_CATCHMENT_ID,
     )
     roads = (
         RoadSegment(
-            road_id="ROAD-FAST",
+            road_id=DEMO_ROAD_DIRECT_ID,
             geometry=LineString(
                 [
                     (78.0300, 30.3202),
                     (78.0330, 30.3232),
                 ]
             ),
-            road_name="Fast Road",
+            road_name="Shelter Corridor",
             provenance=SpatialDataProvenance.ESTIMATED,
-            catchment_id="UK-CHM-DEHRADUN-01",
+            catchment_id=DEMO_CATCHMENT_ID,
         ),
         RoadSegment(
-            road_id="ROAD-BYPASS",
+            road_id=DEMO_ROAD_BYPASS_ID,
             geometry=LineString(
                 [
                     (78.0290, 30.3190),
                     (78.0340, 30.3245),
                 ]
             ),
-            road_name="Bypass Road",
+            road_name="Higher Ground Bypass",
             provenance=SpatialDataProvenance.ESTIMATED,
-            catchment_id="UK-CHM-DEHRADUN-01",
+            catchment_id=DEMO_CATCHMENT_ID,
         ),
     )
     environmental = {
-        "ROAD-FAST": RoadEnvironmentalContext(
+        DEMO_ROAD_DIRECT_ID: RoadEnvironmentalContext(
             catchment_risk_score=0.0,
             terrain_depression_score=0.55,
             stream_proximity_score=0.60,
@@ -183,7 +191,7 @@ def full_context(
             data_confidence=0.82,
             authority_closed=authority_closed,
         ),
-        "ROAD-BYPASS": RoadEnvironmentalContext(
+        DEMO_ROAD_BYPASS_ID: RoadEnvironmentalContext(
             catchment_risk_score=0.0,
             terrain_depression_score=0.15,
             stream_proximity_score=0.20,
@@ -220,7 +228,7 @@ def full_context(
         ),
         drainage=DrainageContext(
             profiles=(drain_profile,),
-            catchment_drain_id="DRAIN-01",
+            catchment_drain_id=DEMO_DRAIN_ID,
             peaking_factor=1.8,
         ),
         roads=RoadContext(
@@ -231,19 +239,19 @@ def full_context(
                 RouteEdgeSpec(
                     "A",
                     "D",
-                    "ROAD-FAST",
+                    DEMO_ROAD_DIRECT_ID,
                     5.0,
                 ),
                 RouteEdgeSpec(
                     "A",
                     "B",
-                    "ROAD-BYPASS",
+                    DEMO_ROAD_BYPASS_ID,
                     8.0,
                 ),
                 RouteEdgeSpec(
                     "B",
                     "D",
-                    "ROAD-BYPASS",
+                    DEMO_ROAD_BYPASS_ID,
                     8.0,
                 ),
             ),
@@ -252,7 +260,7 @@ def full_context(
         ),
         evacuation=EvacuationContext(
             exposure=AdministrativeExposure(
-                unit_id="WARD-07",
+                unit_id=DEMO_WARD_ID,
                 unit_name="Demo Ward 7",
                 unit_type=AdministrativeUnitType.WARD,
                 population=1800,
@@ -263,7 +271,7 @@ def full_context(
             ),
             shelters=(
                 ShelterOption(
-                    shelter_id="SHELTER-01",
+                    shelter_id=DEMO_SHELTER_ID,
                     shelter_name="School Shelter",
                     total_capacity=2200,
                     current_occupancy=150,
@@ -275,7 +283,7 @@ def full_context(
                 EvacuationFlowPath(
                     path_id="PATH-01",
                     route_id="selected_route",
-                    shelter_id="SHELTER-01",
+                    shelter_id=DEMO_SHELTER_ID,
                     travel_time_minutes=18.0,
                     route_throughput_people_per_minute=90.0,
                     shelter_intake_people_per_minute=120.0,
@@ -306,7 +314,7 @@ def test_fused_state_adapter_preserves_v21_shape_and_provenance():
         fused_state(status="SIMULATED")
     )
 
-    assert adapted.catchment_id == "UK-CHM-DEHRADUN-01"
+    assert adapted.catchment_id == DEMO_CATCHMENT_ID
     assert adapted.rainfall.rain_1h.value_mm == pytest.approx(48.0)
     assert adapted.rainfall.rain_1h.status == DataStatus.DERIVED
     assert adapted.rainfall.intensity.status == DataStatus.SIMULATED
@@ -332,9 +340,14 @@ def test_predictor_runs_end_to_end_to_city_intelligence():
     assert result.ward_impact is not None
     assert result.evacuation_readiness is not None
     assert result.city.summary.catchment_count == 1
-    assert result.to_map_dto()["catchment"]["fused_state"] == (
+    dto = result.to_map_dto()
+    assert dto["catchment"]["fused_state"] == (
         "FusedCatchmentState v2.1"
     )
+    assert dto["model_metadata"]["prediction_id"].startswith(
+        f"PRED-{DEMO_CATCHMENT_ID}-"
+    )
+    assert dto["model_metadata"]["operationally_validated"] is False
 
 
 def test_low_risk_low_confidence_is_not_safe():
@@ -371,6 +384,7 @@ def test_simulated_is_not_treated_as_observed():
         == "SIMULATED"
     )
     assert "estimated_inputs_present" in result.confidence.reasons
+    assert "simulated_inputs_present" in result.confidence.reasons
 
 
 def test_missing_rainfall_is_not_zero_reliable_data():
@@ -415,8 +429,8 @@ def test_closed_and_avoid_remain_distinct():
         road.road.road_id: road.assessment.recommendation
         for road in result.roads
     }
-    assert recommendations["ROAD-FAST"] == RoadRecommendation.CLOSED
-    assert recommendations["ROAD-BYPASS"] != RoadRecommendation.CLOSED
+    assert recommendations[DEMO_ROAD_DIRECT_ID] == RoadRecommendation.CLOSED
+    assert recommendations[DEMO_ROAD_BYPASS_ID] != RoadRecommendation.CLOSED
 
 
 def test_no_safe_route_is_explicit_domain_result():

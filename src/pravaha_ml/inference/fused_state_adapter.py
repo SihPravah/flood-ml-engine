@@ -285,6 +285,10 @@ def _to_confidence_provenance(
 ) -> InputProvenance:
     if status == DataStatus.OBSERVED:
         return InputProvenance.OBSERVED
+    if status == DataStatus.DERIVED:
+        return InputProvenance.DERIVED
+    if status == DataStatus.SIMULATED:
+        return InputProvenance.SIMULATED
     if status == DataStatus.MISSING:
         return InputProvenance.MISSING
     return InputProvenance.ESTIMATED

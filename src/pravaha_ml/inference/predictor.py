@@ -264,6 +264,22 @@ class IntegratedIntelligence:
             "route": _plain(self.route),
             "city": _plain(self.city.summary),
             "limitations": list(self.limitations),
+            "model_metadata": {
+                "prediction_id": _prediction_id(
+                    self.fused_state.catchment_id,
+                    generated_at,
+                ),
+                "model_version": self.flood_prediction.model_version,
+                "generated_at": generated_at.isoformat(),
+                "input_state_time": self.fused_state.state_time.isoformat(),
+                "risk_score": self.flood_prediction.risk_score,
+                "risk_level": self.flood_prediction.risk_level.value,
+                "confidence": self.confidence.overall_confidence,
+                "data_quality_score": self.fused_state.data_quality.overall_score,
+                "runtime_status": self.model_runtime_status.value,
+                "operationally_validated": self.model_operationally_validated,
+                "top_factors": list(self.confidence.reasons[:5]),
+            },
             "model": {
                 "name": self.flood_prediction.model_name,
                 "version": self.flood_prediction.model_version,
@@ -1209,6 +1225,23 @@ def _snapshot_id(
         timezone.utc
     )
     return "snap_" + utc.strftime("%Y%m%dT%H%M%SZ")
+
+
+def _prediction_id(
+    catchment_id: str,
+    generated_at: datetime,
+) -> str:
+    utc = generated_at.astimezone(
+        timezone.utc
+    )
+    safe_catchment = catchment_id.replace(
+        "_",
+        "-",
+    )
+    return (
+        f"PRED-{safe_catchment}-"
+        + utc.strftime("%Y%m%dT%H%M%SZ")
+    )
 
 
 def _plain(value: Any) -> Any:

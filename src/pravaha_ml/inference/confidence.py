@@ -12,7 +12,9 @@ from pravaha_ml.features.temporal_quality import (
 
 class InputProvenance(str, Enum):
     OBSERVED = "OBSERVED"
+    DERIVED = "DERIVED"
     ESTIMATED = "ESTIMATED"
+    SIMULATED = "SIMULATED"
     MISSING = "MISSING"
 
 
@@ -205,7 +207,11 @@ def _provenance_score(
 
     estimated_count = sum(
         provenance
-        == InputProvenance.ESTIMATED
+        in {
+            InputProvenance.DERIVED,
+            InputProvenance.ESTIMATED,
+            InputProvenance.SIMULATED,
+        }
         for provenance in provenances
     )
 
@@ -398,6 +404,9 @@ def assess_prediction_confidence(
     )
 
     reasons: list[str] = []
+    input_provenances = tuple(
+        input_provenances
+    )
 
     temporal_score = (
         _temporal_quality_score(
@@ -457,6 +466,14 @@ def assess_prediction_confidence(
     if estimated_fraction > 0.0:
         reasons.append(
             "estimated_inputs_present"
+        )
+
+    if any(
+        provenance == InputProvenance.SIMULATED
+        for provenance in input_provenances
+    ):
+        reasons.append(
+            "simulated_inputs_present"
         )
 
     if provenance_score < 1.0:
