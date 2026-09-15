@@ -137,6 +137,20 @@ class StaticCatchmentContext:
     slope_fraction: float
     slope_degrees: float
 
+    mean_elevation_m: float | None = None
+    min_elevation_m: float | None = None
+    max_elevation_m: float | None = None
+    terrain_source: str | None = None
+    terrain_source_status: str = "ESTIMATED"
+    road_source_status: str = "ESTIMATED"
+    stream_source_status: str = "ESTIMATED"
+    catchment_geometry_status: str = "ESTIMATED"
+    admin_source_status: str = "ESTIMATED"
+    shelter_source_status: str = "ESTIMATED"
+    drain_capacity_status: str = "ESTIMATED"
+    hand_status: str = "NOT_AVAILABLE"
+    twi_status: str = "NOT_AVAILABLE"
+
     dry_threshold_percentage: float = 35.0
     wet_threshold_percentage: float = 70.0
     historical_landslide_score: float = 0.0
