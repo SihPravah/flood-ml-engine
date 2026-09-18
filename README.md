@@ -23,3 +23,11 @@ ML and hydrology service for PRAVAHA.
 ## Python
 
 Python 3.11.x
+
+## Static GIS Context
+
+The live ML boundary remains `FusedCatchmentState v2.1`. For the focused
+Chandrabani PS 26192 demo, static terrain/road/stream context is loaded through
+the ML static-context adapter and must retain source-status metadata such as
+`OPEN_REAL_DATA`, `DERIVED_FROM_REAL_DATA`, `ESTIMATED`, `DEMO`, and
+`NOT_AVAILABLE`.

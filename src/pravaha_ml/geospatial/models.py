@@ -9,9 +9,14 @@ from shapely.geometry import (
 
 
 class SpatialDataProvenance(str, Enum):
+    AUTHORITATIVE = "AUTHORITATIVE"
+    OPEN_REAL_DATA = "OPEN_REAL_DATA"
     VERIFIED = "VERIFIED"
     DERIVED = "DERIVED"
+    DERIVED_FROM_REAL_DATA = "DERIVED_FROM_REAL_DATA"
     ESTIMATED = "ESTIMATED"
+    DEMO = "DEMO"
+    NOT_AVAILABLE = "NOT_AVAILABLE"
 
 
 @dataclass(frozen=True)

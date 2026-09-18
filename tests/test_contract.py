@@ -5,7 +5,7 @@ from pravaha_ml.contracts.input import SensorIngestionPayload
 
 
 VALID_PAYLOAD = {
-    "device_id": "SIM_NODE_04",
+    "device_id": "SENSOR-SIM-RAIN-SOIL-01",
     "timestamp": "2026-08-30T14:30:00Z",
     "location": {
         "village": "Munnar",
@@ -24,7 +24,7 @@ VALID_PAYLOAD = {
 def test_valid_sensor_payload():
     payload = SensorIngestionPayload.model_validate(VALID_PAYLOAD)
 
-    assert payload.device_id == "SIM_NODE_04"
+    assert payload.device_id == "SENSOR-SIM-RAIN-SOIL-01"
     assert payload.location.village == "Munnar"
     assert payload.location.ward == "Ward_3"
 

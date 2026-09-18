@@ -4,7 +4,7 @@ from pravaha_ml.features.adapter import build_sensor_features
 
 def test_build_sensor_features():
     raw_payload = {
-        "device_id": "SIM_NODE_04",
+        "device_id": "SENSOR-SIM-RAIN-SOIL-01",
         "timestamp": "2026-08-30T14:30:00Z",
         "location": {
             "village": "Munnar",
@@ -23,7 +23,7 @@ def test_build_sensor_features():
 
     features = build_sensor_features(payload)
 
-    assert features.device_id == "SIM_NODE_04"
+    assert features.device_id == "SENSOR-SIM-RAIN-SOIL-01"
 
     assert features.village == "Munnar"
     assert features.ward == "Ward_3"
